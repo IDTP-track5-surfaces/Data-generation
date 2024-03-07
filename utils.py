@@ -1,43 +1,13 @@
 import numpy as np
-from scipy.interpolate import interp2d, griddata
-from scipy.fft import ifft2
-from scipy.ndimage import sobel, convolve, laplace
-from scipy.signal import convolve2d
-from tqdm import tqdm
+from scipy.interpolate import griddata
+from scipy.ndimage import sobel
 
-
-# Function to write NPY file
-def write_npy(data, filename):
-    np.save(filename, data)
-    
-# Function to simulate distortion
-def simulate(img, warp_x, warp_y, is_shown=False, n_frame=None):
-    h, w, n_channel = img.shape
-
-    X, Y = np.meshgrid(np.arange(1, w + 1), np.arange(1, h + 1))
-
-    x_c = warp_x
-    y_c = warp_y
-
-    Xnew = np.reshape(X + x_c, (h * w, 1))
-    Ynew = np.reshape(Y + y_c, (h * w, 1))
-
-    valid = (Xnew >= 1) & (Xnew <= w) & (Ynew >= 1) & (Ynew <= h)
-
-    img_curr = np.zeros((h, w, n_channel))
-    curr_frame = np.zeros(h * w)
-
-    for k in range(n_channel):
-        curr_frame[valid] = interp2d(img[:, :, k], Xnew[valid], Ynew[valid])
-        img_curr[:, :, k] = np.reshape(curr_frame, (h, w))
-
-    return img_curr
-
+   
 # Function to perform ray tracing
-def raytracing_im_generator_ST(im_rgb, this_depth, n1, n2, x, y):
+def raytracing_im_generator_ST(im_rgb, this_depth, n1, n2, selector = True):
     step = 1
     h, w, dim = im_rgb.shape
-    # h, w = im_rgb.shape
+
 
     Gx = sobel(this_depth, axis=0)
     Gy = sobel(this_depth, axis=1)
@@ -49,9 +19,15 @@ def raytracing_im_generator_ST(im_rgb, this_depth, n1, n2, x, y):
     norm = np.sqrt(Gx**2 + Gy**2 + 1)
     normal = normal_ori / norm[..., None]
 
-    s1 = np.zeros_like(normal)
-    s1[:, :, 2] = -1
-    s2 = refraction(normal, s1, n1, n2)
+    if selector: # refraction
+        s1 = np.zeros_like(normal)
+        s1[:, :, 2] = -1
+        s2 = refraction(normal, s1, n1, n2)
+    else: # reflection 
+        print("Not implemented")
+        s1 = np.zeros_like(normal)
+        s2 = reflection(normal, s1) # NOT IMPLEMENTED
+    
 
     a = this_depth / s2[:, :, 2]
     x_c = np.round(a * s2[:, :, 0] / step, 2)
@@ -75,26 +51,48 @@ def refraction(normal, s1, n1, n2):
     return s2_normalized
 
 
-# def refraction(normal, s, n1, n2):
-#     n = n1 / n2
-#     dot_n_s = normal[:, :, 0] * s[:, :, 0] + normal[:, :, 1] * s[:, :, 1] + normal[:, :, 2] * s[:, :, 2]
+# def reflection(normal, s1):
+#     dot_n_s = normal[:, :, 0] * s1[:, :, 0] + normal[:, :, 1] * s1[:, :, 1] + normal[:, :, 2] * s1[:, :, 2]
 
-#     cos_theta_t = np.sqrt(1 - n**2 * (1 - dot_n_s**2))
-#     refraction_vec = n * s + (n * dot_n_s - cos_theta_t) * normal
+#     s2 = s1 + 2*-dot_n_s*normal
 
-#     return refraction_vec
+#     return s2
 
-# def reflection(normal, s, n1, n2):
-#     dot_n_s = normal[:, :, 0] * s[:, :, 0] + normal[:, :, 1] * s[:, :, 1] + normal[:, :, 2] * s[:, :, 2]
+def deform_image(img, warp_map):
+    h, w, nChannel = img.shape
+    # Create meshgrid for the original coordinates
+    X, Y = np.meshgrid(np.arange(1, w + 1), np.arange(1, h + 1))
 
-#     reflection_vec = s + 2*-dot_n_s*normal
+    x_c = warp_map[:,:,0]
+    y_c = warp_map[:,:,1]
 
-#     return reflection_vec
+    # Mapping coordinates to warped coordinates
+    Xnew = X + x_c
+    Ynew = Y + y_c
 
-# Example usage
-# im_rgb = np.random.rand(128, 128, 3)
-# this_depth = np.random.rand(128, 128)
-# n1 = 1.0
-# n2 = 1.33
-# x, y = np.meshgrid(np.arange(1, 129), np.arange(1, 129))
-# warp_map = raytracing_im_generator_ST(im_rgb, this_depth, n1, n2, x, y)
+    # Flattening the original coordinates and values
+    Xnew = Xnew.flatten()
+    Ynew = Ynew.flatten()
+
+    # Selecting only the valid points
+    valid = np.logical_and.reduce([Xnew >= 1, Xnew <= w, Ynew >= 1, Ynew <= h])
+    x_valid = Xnew[valid]
+    y_valid = Ynew[valid]
+
+    imgCurr = np.zeros((h, w, nChannel))
+
+    # Interpolate all channels of the image
+    for k in range(nChannel):
+        currFrame = np.zeros(h * w)
+        currFrame[valid] = griddata((X.flatten(), Y.flatten()), img[:,:,k].flatten(), (x_valid, y_valid), method='linear', fill_value = 0)
+        imgCurr[:,:, k] = np.reshape(currFrame, (h, w), order='F')
+    
+    return imgCurr
+
+def generate_example_depth_map():
+    xymax = 10
+    A = np.zeros((900,900))
+    for i,x in enumerate(np.linspace(-xymax, xymax, num=900)):
+        for j,y in enumerate(np.linspace(-xymax, xymax, num=900)):
+            A[i,j] = 20*np.sin(-(x**2 + y**2)/10)
+    return A
