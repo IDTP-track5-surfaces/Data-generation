@@ -12,7 +12,7 @@ def __main__():
     rgb = imread('tex1.jpg') / 255.0
 
     depth_map = generate_example_depth_map() # Change to depth map from simulation
-    warp_map = raytracing_im_generator_ST(rgb, depth_map, n1, n2)
+    warp_map = raytracing_im_generator_ST(rgb, depth_map, n1, n2, selector=False)
     
     rgb_refraction = deform_image(rgb, warp_map)
     
