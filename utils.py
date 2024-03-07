@@ -26,12 +26,12 @@ def raytracing_im_generator_ST(im_rgb, depth_map, n1, n2, selector = True):
     s1[:, :, 2] = -1
     
     if selector: # refraction
-        s2 = refraction(normal, s1, n1, n2)
+        s2 = refraction_wikipedia(normal, s1, n1, n2)
     else: # reflection 
         print("Not implemented")
         
         # Rotation angle
-        incident_angle = np.pi/3 # 60 degrees
+        incident_angle = np.radians(20)
         theta = np.pi/2 - incident_angle
 
         # Rotation matrix
@@ -40,7 +40,7 @@ def raytracing_im_generator_ST(im_rgb, depth_map, n1, n2, selector = True):
         # Rotated incident vectors
         s1 = np.einsum('ij,pqj->pqi', R, s1)
         
-        s2 = reflection(normal, s1) # NOT IMPLEMENTED
+        s2 = reflection(normal, s1)
     
 
     a = depth_map / s2[:, :, 2]
@@ -68,20 +68,22 @@ def refraction_wikipedia(normal, s1, n1, n2):
     n = n1/n2
     
     cos1 = np.einsum('ijk, ijk->ij', -normal, s1)
-    cos2 = np.sqrt(1-normal**2*(1-cos1**2))
+    cos2 = np.sqrt(1-n**2*(1-cos1**2))
     
-    s2 = n*s1 + (n*cos1-cos2)*normal
+    s2 = n*s1 + (n*cos1-cos2)[...,None]*normal
     
     s2_normalized = s2/np.linalg.norm(s2, axis =2)[..., None]
     
     return s2_normalized
 
-# def reflection(normal, s1):
-#     dot_n_s = normal[:, :, 0] * s1[:, :, 0] + normal[:, :, 1] * s1[:, :, 1] + normal[:, :, 2] * s1[:, :, 2]
+def reflection(normal, s1):
+    cos1 = np.einsum('ijk, ijk->ij', -normal, s1)
 
-#     s2 = s1 + 2*-dot_n_s*normal
+    s2 = s1 + 2*cos1[...,None]*normal
 
-#     return s2
+    s2_normalized = s2/np.linalg.norm(s2, axis =2)[..., None]
+    
+    return s2_normalized
 
 def deform_image(img, warp_map):
     """_summary_
