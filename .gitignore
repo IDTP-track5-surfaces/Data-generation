@@ -1,2 +1,5 @@
 __pycache__/
 .ipynb_checkpoints
+
+wave_sequences/
+data_sets/
