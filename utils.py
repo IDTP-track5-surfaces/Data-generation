@@ -4,16 +4,16 @@ from scipy.ndimage import sobel
 
    
 # Function to perform ray tracing
-def raytracing_im_generator_ST(im_rgb, depth_map, n1, n2, selector = True):
+def raytracing_im_generator_ST(depth_map, n1, n2, transparent):
     step = 1
-    h, w, channels = im_rgb.shape
-
+    h, w = depth_map.shape
+    
     # Generate normal map from depth map
     Gx = sobel(depth_map, axis=0)
     Gy = sobel(depth_map, axis=1)
 
     # Create normal vectors
-    normal_ori = np.ones((h,w, 3))
+    normal_ori = np.ones((h, w, 3)) # Default reference image size
     normal_ori[:, :, 0] = -Gx
     normal_ori[:, :, 1] = -Gy
     
@@ -25,11 +25,9 @@ def raytracing_im_generator_ST(im_rgb, depth_map, n1, n2, selector = True):
     s1 = np.zeros_like(normal)
     s1[:, :, 2] = -1
     
-    if selector: # refraction
+    if transparent == "refraction":
         s2 = refraction_wikipedia(normal, s1, n1, n2)
-    else: # reflection 
-        print("Not implemented")
-        
+    elif transparent == "reflection":         
         # Rotation angle
         incident_angle = np.radians(20)
         theta = np.pi/2 - incident_angle
@@ -41,7 +39,8 @@ def raytracing_im_generator_ST(im_rgb, depth_map, n1, n2, selector = True):
         s1 = np.einsum('ij,pqj->pqi', R, s1)
         
         s2 = reflection(normal, s1)
-    
+    else:
+        print("Not implemented")
 
     a = depth_map / s2[:, :, 2]
     x_c = np.round(a * s2[:, :, 0] / step, 2)
@@ -52,6 +51,7 @@ def raytracing_im_generator_ST(im_rgb, depth_map, n1, n2, selector = True):
     return warp_map
 
 
+# This is the formula from the paper
 def refraction(normal, s1, n1, n2):
     this_normal = normal
     s1_normalized = s1 / np.sqrt(s1[:,:,0]**2 + s1[:,:,1]**2 + s1[:,:,2]**2)[..., None]
@@ -64,6 +64,7 @@ def refraction(normal, s1, n1, n2):
 
     return s2_normalized
 
+# This is equivalent formula from wikipedia: https://en.wikipedia.org/wiki/Snell%27s_law
 def refraction_wikipedia(normal, s1, n1, n2):
     n = n1/n2
     
@@ -85,17 +86,7 @@ def reflection(normal, s1):
     
     return s2_normalized
 
-def deform_image(img, warp_map):
-    """_summary_
-
-    Args:
-        img (_type_): Original reference pattern
-        warp_map (_type_): _description_
-
-    Returns:
-        _type_: _description_
-    """
-    
+def deform_image(img, warp_map):    
     h, w, nChannel = img.shape
     # Create meshgrid for the original coordinates
     X, Y = np.meshgrid(np.arange(1, w + 1), np.arange(1, h + 1))
@@ -125,11 +116,3 @@ def deform_image(img, warp_map):
         imgCurr[:,:, k] = np.reshape(currFrame, (h, w), order='F')
     
     return imgCurr
-
-def generate_example_depth_map():
-    xymax = 10
-    depth_map = np.zeros((900,900))
-    for i,x in enumerate(np.linspace(-xymax, xymax, num=900)):
-        for j,y in enumerate(np.linspace(-xymax, xymax, num=900)):
-            depth_map[i,j] = 20*np.sin(-(x**2 + y**2)/10)
-    return depth_map
