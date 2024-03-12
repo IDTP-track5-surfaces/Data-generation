@@ -37,7 +37,7 @@ def create_warp_maps(train_or_test, refract_or_reflect, n1 = 1, n2 = 1.33):
             seq_index = seq[4:]
                 
             for frame_idx, file in enumerate(os.listdir(seq_path)):
-                depth_map = np.load(os.path.join(seq_path, "depth", file))
+                depth_map = np.load(os.path.join(seq_path, file))
                 
                 # Save depth map
                 file_name = "depth_" + str(wave_index) + "_"  + str(seq_index) + "_"  + str(frame_idx) + ".npy"
@@ -71,18 +71,21 @@ def warp_image(image, image_name, train_or_test, refract_or_reflect):
     
     for file in os.listdir(warp_dir):
         warp_map = np.load(os.path.join(warp_dir, file))
-        image_name = image_name + file[4:-3] + "jpg"
+        image_name_save = image_name + file[4:-3] + "jpg"
         
         # Deform image
         rgb_deformation = deform_image(rgb, warp_map)
         image_deformation = np.array(rgb_deformation * 255, dtype=np.uint8)
 
-        imwrite(os.path.join(save_dir, "warped_image", image_name), image_deformation)
+        imwrite(os.path.join(save_dir, "warped_image", image_name_save), image_deformation)
             
             
 if __name__ == "__main__":
+    phase = "train" #"test"
+    refract_or_reflect = "refraction"
+    
     create_directory_structure()
-    create_warp_maps(train_or_test="train", refract_or_reflect="refraction", n1=1, n2=1.33)
+    create_warp_maps(train_or_test=phase, refract_or_reflect=refract_or_reflect, n1=1, n2=1.33)
     
     # Create deformed image for each reference pattern
     for file in os.listdir('reference_patterns'):
@@ -90,4 +93,4 @@ if __name__ == "__main__":
         file_path = os.path.join('reference_patterns', file)
         image  = imread(file_path)
 
-        warp_image(image, file_name, train_or_test="train", refract_or_reflect="refraction")
+        warp_image(image, file_name, train_or_test=phase, refract_or_reflect=refract_or_reflect)
