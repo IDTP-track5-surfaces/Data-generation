@@ -3,17 +3,10 @@ import numpy as np
 from utils import deform_image, raytracing_im_generator_ST
 from imageio.v2 import imwrite, imread
 
-import matplotlib.pyplot as plt
-
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
 REFERENCE_PATTERN_DIR = os.path.join(ROOT_DIR, "reference_patterns")
 WAVE_SEQUENCE_DIR = os.path.join(ROOT_DIR, "wave_sequences")
 DATA_SETS_DIR = os.path.join(ROOT_DIR, "data_sets")
-
-# TRAINING_IMAGE_DIR = os.path.join(WAVE_SEQUENCE_DIR, "data_sets", "training_images")
-# TEST_IMAGE_DIR = os.path.join(WAVE_SEQUENCE_DIR, "data_sets", "test_images")
-# DATA_DIR = {'train': TRAINING_IMAGE_DIR, 'test': TEST_IMAGE_DIR}
-
 
 def create_directory_structure():
     if not os.path.exists(DATA_SETS_DIR):
@@ -43,7 +36,7 @@ def create_warp_maps(train_or_test, refract_or_reflect, n1 = 1, n2 = 1.33):
             seq_path = os.path.join(wave_path, seq)
             seq_index = seq[4:]
                 
-            for frame_idx, file in enumerate(os.listdir(os.path.join(seq_path, "depth"))):
+            for frame_idx, file in enumerate(os.listdir(seq_path)):
                 depth_map = np.load(os.path.join(seq_path, "depth", file))
                 
                 # Save depth map
