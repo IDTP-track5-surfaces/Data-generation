@@ -26,6 +26,7 @@ def raytracing_im_generator_ST(depth_map, n1, n2, transparent):
     s1[:, :, 2] = -1
     
     if transparent == "refraction":
+        # s2 = refraction(normal, s1, n1, n2)
         s2 = refraction_wikipedia(normal, s1, n1, n2)
     elif transparent == "reflection":         
         # Rotation angle
@@ -113,6 +114,6 @@ def deform_image(img, warp_map):
     for k in range(nChannel):
         currFrame = np.zeros(h * w)
         currFrame[valid] = griddata((X.flatten(), Y.flatten()), img[:,:,k].flatten(), (x_valid, y_valid), method='linear', fill_value = 0)
-        imgCurr[:,:, k] = np.reshape(currFrame, (h, w), order='F')
+        imgCurr[:,:, k] = np.reshape(currFrame, (h, w))
     
     return imgCurr
