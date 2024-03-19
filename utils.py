@@ -89,31 +89,34 @@ def reflection(normal, s1):
 
 def deform_image(img, warp_map):    
     h, w, nChannel = img.shape
+    h_map, w_map, _ = warp_map.shape
+    
     # Create meshgrid for the original coordinates
-    X, Y = np.meshgrid(np.arange(1, w + 1), np.arange(1, h + 1))
+    X, Y = np.meshgrid(np.arange(w), np.arange(h))
 
     x_c = warp_map[:,:,0]
     y_c = warp_map[:,:,1]
 
+    # Select middle of image 
+    start_row = (h - h_map)//2
+    end_row =  start_row + h_map
+    start_col = (w - w_map)//2
+    end_col = start_col + w_map
+
     # Mapping coordinates to warped coordinates
-    Xnew = X + x_c
-    Ynew = Y + y_c
+    Xnew = X[start_row:end_row, start_col:end_col] + x_c
+    Ynew = Y[start_row:end_row, start_col:end_col] + y_c
 
     # Flattening the original coordinates and values
     Xnew = Xnew.flatten()
     Ynew = Ynew.flatten()
 
-    # Selecting only the valid points
-    valid = np.logical_and.reduce([Xnew >= 1, Xnew <= w, Ynew >= 1, Ynew <= h])
-    x_valid = Xnew[valid]
-    y_valid = Ynew[valid]
-
-    imgCurr = np.zeros((h, w, nChannel))
+    imgCurr = np.zeros((h_map, w_map, nChannel))
 
     # Interpolate all channels of the image
     for k in range(nChannel):
-        currFrame = np.zeros(h * w)
-        currFrame[valid] = griddata((X.flatten(), Y.flatten()), img[:,:,k].flatten(), (x_valid, y_valid), method='linear', fill_value = 0)
-        imgCurr[:,:, k] = np.reshape(currFrame, (h, w))
+        currFrame_valid = np.zeros(h * w)
+        currFrame = griddata((X.flatten(), Y.flatten()), img[:,:,k].flatten(), (Xnew, Ynew), method='linear', fill_value = 0)
+        imgCurr[:,:, k] = np.reshape(currFrame, (h_map, w_map))
     
     return imgCurr
