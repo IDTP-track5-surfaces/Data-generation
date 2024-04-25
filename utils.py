@@ -1,37 +1,23 @@
 import numpy as np
 from scipy.interpolate import griddata
-from scipy.ndimage import sobel
+from scipy.ndimage import gaussian_filter #,sobel
 
    
 # Function to perform ray tracing
-def raytracing_im_generator_ST(depth_map, n1, n2, transparent):
-    step = 1
-    h, w = depth_map.shape
-    
-    # Generate normal map from depth map
-    Gx = sobel(depth_map, axis=0)
-    Gy = sobel(depth_map, axis=1)
-
-    # Create normal vectors
-    normal_ori = np.ones((h, w, 3)) # Default reference image size
-    normal_ori[:, :, 0] = -Gx
-    normal_ori[:, :, 1] = -Gy
-    
-    # Normalize normal vectors
-    norm = np.sqrt(Gx**2 + Gy**2 + 1)
-    normal = normal_ori / norm[..., None]
-
+def raytracing_im_generator_ST(normal, depth_map, transparent, n1=1, n2=1.33):
     # Create incident vectors
     s1 = np.zeros_like(normal)
     s1[:, :, 2] = -1
     
     if transparent == "refraction":
-        # s2 = refraction(normal, s1, n1, n2)
-        s2 = refraction_wikipedia(normal, s1, n1, n2)
+        s2 = refraction(normal, s1, n1, n2)
+               
+        a = depth_map / s2[:, :, 2]
+        x_c = a * s2[:, :, 0]
+        y_c = a * s2[:, :, 1]
     elif transparent == "reflection":         
         # Rotation angle
-        incident_angle = np.radians(20)
-        theta = np.pi/2 - incident_angle
+        theta = np.deg2rad(80) # incident angle
 
         # Rotation matrix
         R = np.array([[1, 0, 0],[0, np.cos(theta), -np.sin(theta)], [0, np.sin(theta), np.cos(theta)]])
@@ -40,33 +26,38 @@ def raytracing_im_generator_ST(depth_map, n1, n2, transparent):
         s1 = np.einsum('ij,pqj->pqi', R, s1)
         
         s2 = reflection(normal, s1)
+                
+        gamma = 256*.2
+
+        r = np.abs(s1)
+        w = -gamma*(s2 - r*np.einsum('ijk, ijk->ij', s2, r)[..., None])
+
+        x_c = w[:,:,0]
+        y_c = np.sqrt(w[:,:,1]**2 + w[:,:,2]**2)
     else:
         print("Not implemented")
 
-    a = depth_map / s2[:, :, 2]
-    x_c = np.round(a * s2[:, :, 0] / step, 2)
-    y_c = np.round(a * s2[:, :, 1] / step, 2)
 
     warp_map = np.dstack((x_c, y_c))
 
     return warp_map
 
 
-# This is the formula from the paper
-def refraction(normal, s1, n1, n2):
-    this_normal = normal
-    s1_normalized = s1 / np.sqrt(s1[:,:,0]**2 + s1[:,:,1]**2 + s1[:,:,2]**2)[..., None]
+## This is the formula from the paper
+# def refraction(normal, s1, n1, n2):
+#     this_normal = normal
+#     s1_normalized = s1 / np.sqrt(s1[:,:,0]**2 + s1[:,:,1]**2 + s1[:,:,2]**2)[..., None]
     
-    term_1 = np.cross(this_normal, np.cross(-this_normal, s1_normalized, axis=2), axis=2)
-    term_2 = np.sqrt(1 - (n1 / n2)**2 * np.sum(np.cross(this_normal, s1_normalized, axis=2) * np.cross(this_normal, s1_normalized, axis=2), axis=2))
+#     term_1 = np.cross(this_normal, np.cross(-this_normal, s1_normalized, axis=2), axis=2)
+#     term_2 = np.sqrt(1 - (n1 / n2)**2 * np.sum(np.cross(this_normal, s1_normalized, axis=2) * np.cross(this_normal, s1_normalized, axis=2), axis=2))
     
-    s2 = (n1 / n2) * term_1 - this_normal * term_2[...,None]
-    s2_normalized = s2 / np.sqrt(s2[:,:,0]**2 + s2[:,:,1]**2 + s2[:,:,2]**2)[...,None]
+#     s2 = (n1 / n2) * term_1 - this_normal * term_2[...,None]
+#     s2_normalized = s2 / np.sqrt(s2[:,:,0]**2 + s2[:,:,1]**2 + s2[:,:,2]**2)[...,None]
 
-    return s2_normalized
+#     return s2_normalized
 
 # This is equivalent formula from wikipedia: https://en.wikipedia.org/wiki/Snell%27s_law
-def refraction_wikipedia(normal, s1, n1, n2):
+def refraction(normal, s1, n1, n2):
     n = n1/n2
     
     cos1 = np.einsum('ijk, ijk->ij', -normal, s1)
@@ -120,3 +111,35 @@ def deform_image(img, warp_map):
         imgCurr[:,:, k] = np.reshape(currFrame, (h_map, w_map))
     
     return imgCurr
+
+# Profile funtions
+def exp_f(x,a,b,c):
+    return a*np.exp(-(x/b)) + c;
+ 
+def pol2_f(x,a,b,c):
+    return a*x + b*x**2 + c;
+ 
+def Puff_profile(x,y,ta):
+    # evaluation of surface deformation extracted from EXP_ID=142
+    upper = exp_f(ta,-6.17761515e-05,  1.78422769e+00,  7.40139158e-05);
+    lower = exp_f(ta,0.00377156,  1.45234773, -0.00326456);
+    a     = pol2_f(ta,0.31294945, -0.00963803,  2.6743828);
+    b     = pol2_f(ta,38.56906702,  -1.6278976 , 453.87937763);
+    r = np.sqrt(x**2 + y**2);
+    # scaled logistic function describing surface deformation
+    return lower + (upper - lower) / (1 + np.exp(a - b * r));
+
+## Replace with cubic bsplines
+# def Puff_normal(x,y,ta):
+#     # evaluation of surface deformation extracted from EXP_ID=142
+#     upper = exp_f(ta,-6.17761515e-05,  1.78422769e+00,  7.40139158e-05);
+#     lower = exp_f(ta,0.00377156,  1.45234773, -0.00326456);
+#     a     = pol2_f(ta,0.31294945, -0.00963803,  2.6743828);
+#     b     = pol2_f(ta,38.56906702,  -1.6278976 , 453.87937763);
+#     r = np.sqrt(x**2 + y**2);
+#     # scaled logistic function describing surface deformation
+    
+#     G = (upper - lower)*np.exp(a - b * r)*b/(r*(1+np.exp(a - b * r)))
+#     Gx = G*x
+#     Gy = G*y
+#     return Gx, Gy
