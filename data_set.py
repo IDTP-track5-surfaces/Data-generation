@@ -18,7 +18,7 @@ def create_directory_structure():
                 os.makedirs(os.path.join(DATA_SETS_DIR, i, "warped_image", j))
             
             
-def create_depth_and_normal_maps(phase, w=256, fps = 24):
+def create_depth_and_normal_maps(phase, w=128, fps = 24):
     x = np.linspace(-52e-3,52e-3, w); # in meter
     y = np.linspace(-52e-3,52e-3, w); # in meter
     X, Y = np.meshgrid(x, y)
