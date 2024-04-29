@@ -1,6 +1,7 @@
 import os
 import numpy as np
 from utils import *
+from scipy.interpolate import RectBivariateSpline
 from imageio.v2 import imwrite, imread
 
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -17,31 +18,45 @@ def create_directory_structure():
                 os.makedirs(os.path.join(DATA_SETS_DIR, i, "warped_image", j))
             
             
-def create_depth_maps(phase, w=265, fps = 24):
+def create_depth_and_normal_maps(phase, w=256, fps = 24):
     x = np.linspace(-52e-3,52e-3, w); # in meter
     y = np.linspace(-52e-3,52e-3, w); # in meter
-    x2, y2 = np.meshgrid(x, y)
+    X, Y = np.meshgrid(x, y)
+    seq = 0
     
-    for i, ta in enumerate(np.linspace(0,10, fps*10)):
-        depth_map = Puff_profile(x2, y2, ta) # TD: change for multiple profiles
-        
-        # Adjust height
-        depth_map = depth_map + 2e-2  
-        
-        file_name = f"depth_map_seq0_f{i}" # change sequence number
-        np.save(os.path.join(DATA_SETS_DIR, phase, "depth", file_name), depth_map)
+    # for dx in np.linspace(-13e-3,13-3, 10):
+    #     for dy in np.linspace(-13e-3,13-3, 10):
+    for wave_width in np.linspace(0.5, 3, 100):
+        for i, ta in enumerate(np.linspace(0.5, 10, fps*10)):
+            depth_map = Puff_profile(X, Y, ta, width=wave_width) 
+            
+            # Apply 2D cubic spline interpolation
+            depth_map_smooth = RectBivariateSpline(x, y, depth_map)
+            
+            # Compute the gradients of depth_map_smooth with respect to x and y
+            Gx = depth_map_smooth.partial_derivative(1,0)(x,y) 
+            Gy = depth_map_smooth.partial_derivative(0,1)(x,y)
+                
+            # Create normal vectors
+            normal_ori = np.ones((w, w, 3)) # Default reference image size
+            normal_ori[:, :, 0] = -Gx
+            normal_ori[:, :, 1] = -Gy
+            
+            # Normalize normal vectors
+            norm = np.sqrt(Gx**2 + Gy**2 + 1)
+            normal = normal_ori / norm[..., None]
+
+            # Adjust height
+            depth_map = depth_map + 2e-2  
+            
+            # Save normal and depth map
+            file_name_depth = f"depth_map_seq{seq}_f{i}" 
+            file_name_normal = f"normal_map_seq{seq}_f{i}" 
+            np.save(os.path.join(DATA_SETS_DIR, phase, "depth", file_name_depth), depth_map)
+            np.save(os.path.join(DATA_SETS_DIR, phase, "normal", file_name_normal), normal)
+        # Increase sequence number for different simulation
+        seq +=1
     return
-
-
-def create_normal_maps(phase):
-    depth_dir = os.path.join(DATA_SETS_DIR, phase, "depth")
-    
-    for file in os.listdir(depth_dir):
-        file_index = os.path.splitext(file[9:])[0]
-        # print(file_index)
-    #Frisos function
-    return
-
 
 def create_warp_maps(phase, n1 = 1, n2 = 1.33):
     """This function creates a warp map corresponding to a depth map and normalmap
@@ -62,7 +77,7 @@ def create_warp_maps(phase, n1 = 1, n2 = 1.33):
         for transparent in ["reflection", "refraction"]:
             warp_map = raytracing_im_generator_ST(normal, depth_map, transparent, n1=n1, n2=n2)
             file_name = "warp_map" + file_index
-            np.save(os.path.join(DATA_SETS_DIR, phase, "warp_map", file_name), warp_map)
+            np.save(os.path.join(DATA_SETS_DIR, phase, "warp_map", transparent, file_name), warp_map)
             
                     
 def create_warped_images(image, image_name, phase):
@@ -80,11 +95,11 @@ def create_warped_images(image, image_name, phase):
     # save_dir = os.path.join(DATA_SETS_DIR, phase,  train_or_test)
     warp_dir = os.path.join(DATA_SETS_DIR, phase, "warp_map")
         
-    for transparent in ["reflection", "refraction"]:
+    for transparent in ["refraction"]: #["reflection", "refraction"]
         warp_dir = os.path.join(DATA_SETS_DIR, phase, "warp_map", transparent)
         for file in os.listdir(warp_dir):
             warp_map = np.load(os.path.join(warp_dir, file))
-            image_name_save = image_name + file[8:-3] + "jpg" # check this
+            image_name_save = image_name + file[8:-3] + "png" # check this
         
             # Deform image
             rgb_deformation = deform_image(rgb, warp_map)
@@ -97,11 +112,10 @@ if __name__ == "__main__":
     phase = "train" #"test"/validation
     
     create_directory_structure()
-    create_depth_maps(phase)
-    create_normal_maps(phase)    
+    create_depth_and_normal_maps(phase, w=128, fps=10)
     create_warp_maps(phase, n1=1, n2=1.33) 
     
-    # Create deformed image for each reference pattern
+    # # Create deformed image for each reference pattern
     for file in os.listdir('reference_patterns'):
         file_name = os.path.splitext(file)[0]
         file_path = os.path.join('reference_patterns', file)
