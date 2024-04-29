@@ -45,20 +45,6 @@ def raytracing_im_generator_ST(normal, depth_map, transparent, n1=1, n2=1.33):
 
     return warp_map
 
-
-## This is the formula from the paper
-# def refraction(normal, s1, n1, n2):
-#     this_normal = normal
-#     s1_normalized = s1 / np.sqrt(s1[:,:,0]**2 + s1[:,:,1]**2 + s1[:,:,2]**2)[..., None]
-    
-#     term_1 = np.cross(this_normal, np.cross(-this_normal, s1_normalized, axis=2), axis=2)
-#     term_2 = np.sqrt(1 - (n1 / n2)**2 * np.sum(np.cross(this_normal, s1_normalized, axis=2) * np.cross(this_normal, s1_normalized, axis=2), axis=2))
-    
-#     s2 = (n1 / n2) * term_1 - this_normal * term_2[...,None]
-#     s2_normalized = s2 / np.sqrt(s2[:,:,0]**2 + s2[:,:,1]**2 + s2[:,:,2]**2)[...,None]
-
-#     return s2_normalized
-
 # This is equivalent formula from wikipedia: https://en.wikipedia.org/wiki/Snell%27s_law
 def refraction(normal, s1, n1, n2):
     n = n1/n2
@@ -122,27 +108,13 @@ def exp_f(x,a,b,c):
 def pol2_f(x,a,b,c):
     return a*x + b*x**2 + c;
  
-def Puff_profile(x, y, dx, dy, ta):
+def Puff_profile(x, y, ta, dx=0, dy=0, width=1):
     # evaluation of surface deformation extracted from EXP_ID=142
-    upper = exp_f(ta,-6.17761515e-05,  1.78422769e+00,  7.40139158e-05);
-    lower = exp_f(ta,0.00377156,  1.45234773, -0.00326456);
-    a     = pol2_f(ta,0.31294945, -0.00963803,  2.6743828);
-    b     = pol2_f(ta,38.56906702,  -1.6278976 , 453.87937763);
-    r = np.sqrt((x-dx)**2 + (y-dy)**2);
-    # scaled logistic function describing surface deformation
-    return lower + (upper - lower) / (1 + np.exp(a - b * r));
-
-## Replace with cubic bsplines
-# def Puff_normal(x,y,ta):
-#     # evaluation of surface deformation extracted from EXP_ID=142
-#     upper = exp_f(ta,-6.17761515e-05,  1.78422769e+00,  7.40139158e-05);
-#     lower = exp_f(ta,0.00377156,  1.45234773, -0.00326456);
-#     a     = pol2_f(ta,0.31294945, -0.00963803,  2.6743828);
-#     b     = pol2_f(ta,38.56906702,  -1.6278976 , 453.87937763);
-#     r = np.sqrt(x**2 + y**2);
-#     # scaled logistic function describing surface deformation
+    upper = exp_f(ta,-6.17761515e-05,  1.78422769e+00,  7.40139158e-05)
+    lower = exp_f(ta,0.00377156,  1.45234773, -0.00326456)
+    a     = pol2_f(ta,0.31294945, -0.00963803,  2.6743828)
+    b     = pol2_f(ta,38.56906702,  -1.6278976 , 453.87937763)
+    r = np.sqrt((x-dx)**2 + (y-dy)**2)/width
     
-#     G = (upper - lower)*np.exp(a - b * r)*b/(r*(1+np.exp(a - b * r)))
-#     Gx = G*x
-#     Gy = G*y
-#     return Gx, Gy
+    # scaled logistic function describing surface deformation
+    return lower + (upper - lower) / (1 + np.exp(a - b * r))
