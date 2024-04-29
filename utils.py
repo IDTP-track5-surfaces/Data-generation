@@ -5,6 +5,9 @@ from scipy.ndimage import gaussian_filter #,sobel
    
 # Function to perform ray tracing
 def raytracing_im_generator_ST(normal, depth_map, transparent, n1=1, n2=1.33):
+    width, height = depth_map.shape
+    scaling = width/(2*52e-3)
+    
     # Create incident vectors
     s1 = np.zeros_like(normal)
     s1[:, :, 2] = -1
@@ -13,8 +16,8 @@ def raytracing_im_generator_ST(normal, depth_map, transparent, n1=1, n2=1.33):
         s2 = refraction(normal, s1, n1, n2)
                
         a = depth_map / s2[:, :, 2]
-        x_c = a * s2[:, :, 0]
-        y_c = a * s2[:, :, 1]
+        x_c = (a * s2[:, :, 0])*scaling
+        y_c = (a * s2[:, :, 1])*scaling
     elif transparent == "reflection":         
         # Rotation angle
         theta = np.deg2rad(80) # incident angle
@@ -119,13 +122,13 @@ def exp_f(x,a,b,c):
 def pol2_f(x,a,b,c):
     return a*x + b*x**2 + c;
  
-def Puff_profile(x,y,ta):
+def Puff_profile(x, y, dx, dy, ta):
     # evaluation of surface deformation extracted from EXP_ID=142
     upper = exp_f(ta,-6.17761515e-05,  1.78422769e+00,  7.40139158e-05);
     lower = exp_f(ta,0.00377156,  1.45234773, -0.00326456);
     a     = pol2_f(ta,0.31294945, -0.00963803,  2.6743828);
     b     = pol2_f(ta,38.56906702,  -1.6278976 , 453.87937763);
-    r = np.sqrt(x**2 + y**2);
+    r = np.sqrt((x-dx)**2 + (y-dy)**2);
     # scaled logistic function describing surface deformation
     return lower + (upper - lower) / (1 + np.exp(a - b * r));
 
