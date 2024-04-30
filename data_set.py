@@ -10,12 +10,11 @@ DATA_SETS_DIR = os.path.join(ROOT_DIR, "data_sets")
 
 def create_directory_structure():
     if not os.path.exists(DATA_SETS_DIR):
-        # for i in ["train", "test", "validation"]:
         os.makedirs(os.path.join(DATA_SETS_DIR, "depth"))
         os.makedirs(os.path.join(DATA_SETS_DIR, "normal"))
         for j in ["reflection", "refraction"]:
+            os.makedirs(os.path.join(DATA_SETS_DIR,  j))
             os.makedirs(os.path.join(DATA_SETS_DIR, "warp_map", j))
-            os.makedirs(os.path.join(DATA_SETS_DIR, "warped_image", j))
             
             
 def create_depth_and_normal_maps(w=128, fps = 24):
@@ -27,7 +26,7 @@ def create_depth_and_normal_maps(w=128, fps = 24):
     # for dx in np.linspace(-13e-3,13-3, 10):
     #     for dy in np.linspace(-13e-3,13-3, 10):
     for wave_width in np.linspace(0.5, 3, 45):
-        for i, ta in enumerate(np.linspace(0.5, 10, fps*10)):
+        for i, ta in enumerate(np.linspace(0.5, 10, int(fps*10))):
             depth_map = Puff_profile(X, Y, ta, width=wave_width) 
             
             # Apply 2D cubic spline interpolation
@@ -91,7 +90,7 @@ def create_warped_images(image, image_name, gray_scale=False):
     """
     if gray_scale:
         # not true gray scale
-        image = image[:,:,0]
+        image = image[:,:,0][..., np.newaxis]
     
     # Normalization
     rgb = image / 255.0
@@ -106,9 +105,13 @@ def create_warped_images(image, image_name, gray_scale=False):
         
             # Deform image
             rgb_deformation = deform_image(rgb, warp_map)
+            
+            if gray_scale:
+                rgb_deformation = np.concatenate(3*[rgb_deformation], axis=-1)
+            
+            # Save image
             image_deformation = np.array(rgb_deformation * 255, dtype=np.uint8)
-
-            imwrite(os.path.join(DATA_SETS_DIR, "warped_image", transparent, image_name_save), image_deformation)
+            imwrite(os.path.join(DATA_SETS_DIR, transparent, image_name_save), image_deformation)
             
             
 if __name__ == "__main__":
@@ -123,3 +126,6 @@ if __name__ == "__main__":
         image  = imread(file_path)
 
         create_warped_images(image, file_name, gray_scale=True)
+        print(f"{file_name} is finished")
+        
+    print("Data generation is finished")

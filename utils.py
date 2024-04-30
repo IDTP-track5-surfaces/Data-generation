@@ -67,7 +67,7 @@ def reflection(normal, s1):
     
     return s2_normalized
 
-def deform_image(img, warp_map):    
+def deform_image(img, warp_map):
     h, w, nChannel = img.shape
     h_map, w_map, _ = warp_map.shape
     
