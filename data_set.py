@@ -10,15 +10,15 @@ DATA_SETS_DIR = os.path.join(ROOT_DIR, "data_sets")
 
 def create_directory_structure():
     if not os.path.exists(DATA_SETS_DIR):
-        for i in ["train", "test", "validation"]:
-            os.makedirs(os.path.join(DATA_SETS_DIR, i, "depth"))
-            os.makedirs(os.path.join(DATA_SETS_DIR, i, "normal"))
-            for j in ["reflection", "refraction"]:
-                os.makedirs(os.path.join(DATA_SETS_DIR, i, "warp_map", j))
-                os.makedirs(os.path.join(DATA_SETS_DIR, i, "warped_image", j))
+        # for i in ["train", "test", "validation"]:
+        os.makedirs(os.path.join(DATA_SETS_DIR, "depth"))
+        os.makedirs(os.path.join(DATA_SETS_DIR, "normal"))
+        for j in ["reflection", "refraction"]:
+            os.makedirs(os.path.join(DATA_SETS_DIR, "warp_map", j))
+            os.makedirs(os.path.join(DATA_SETS_DIR, "warped_image", j))
             
             
-def create_depth_and_normal_maps(phase, w=128, fps = 24):
+def create_depth_and_normal_maps(w=128, fps = 24):
     x = np.linspace(-52e-3,52e-3, w); # in meter
     y = np.linspace(-52e-3,52e-3, w); # in meter
     X, Y = np.meshgrid(x, y)
@@ -26,7 +26,7 @@ def create_depth_and_normal_maps(phase, w=128, fps = 24):
     
     # for dx in np.linspace(-13e-3,13-3, 10):
     #     for dy in np.linspace(-13e-3,13-3, 10):
-    for wave_width in np.linspace(0.5, 3, 100):
+    for wave_width in np.linspace(0.5, 3, 45):
         for i, ta in enumerate(np.linspace(0.5, 10, fps*10)):
             depth_map = Puff_profile(X, Y, ta, width=wave_width) 
             
@@ -52,13 +52,13 @@ def create_depth_and_normal_maps(phase, w=128, fps = 24):
             # Save normal and depth map
             file_name_depth = f"depth_map_seq{seq}_f{i}" 
             file_name_normal = f"normal_map_seq{seq}_f{i}" 
-            np.save(os.path.join(DATA_SETS_DIR, phase, "depth", file_name_depth), depth_map)
-            np.save(os.path.join(DATA_SETS_DIR, phase, "normal", file_name_normal), normal)
+            np.save(os.path.join(DATA_SETS_DIR, "depth", file_name_depth), depth_map)
+            np.save(os.path.join(DATA_SETS_DIR, "normal", file_name_normal), normal)
         # Increase sequence number for different simulation
         seq +=1
     return
 
-def create_warp_maps(phase, n1 = 1, n2 = 1.33):
+def create_warp_maps(n1 = 1, n2 = 1.33):
     """This function creates a warp map corresponding to a depth map and normalmap
     
     Args:
@@ -66,8 +66,8 @@ def create_warp_maps(phase, n1 = 1, n2 = 1.33):
         n1 (float, optional): Refractive index of the incident medium. Defaults to 1 (air).
         n2 (float, optional): Refractive index of refractive medium. Defaults to 1.33 (water).
     """
-    normal_dir = os.path.join(DATA_SETS_DIR, phase, "normal")
-    depth_dir = os.path.join(DATA_SETS_DIR, phase, "depth")
+    normal_dir = os.path.join(DATA_SETS_DIR, "normal")
+    depth_dir = os.path.join(DATA_SETS_DIR, "depth")
     
     for normal_file, depth_file in zip(os.listdir(normal_dir), os.listdir(depth_dir)):
         file_index = os.path.splitext(depth_file[9:])[0]
@@ -77,10 +77,10 @@ def create_warp_maps(phase, n1 = 1, n2 = 1.33):
         for transparent in ["reflection", "refraction"]:
             warp_map = raytracing_im_generator_ST(normal, depth_map, transparent, n1=n1, n2=n2)
             file_name = "warp_map" + file_index
-            np.save(os.path.join(DATA_SETS_DIR, phase, "warp_map", transparent, file_name), warp_map)
+            np.save(os.path.join(DATA_SETS_DIR, "warp_map", transparent, file_name), warp_map)
             
                     
-def create_warped_images(image, image_name, phase):
+def create_warped_images(image, image_name, gray_scale=False):
     """This function warps a image according to a warp map.
     
     Args:
@@ -89,14 +89,17 @@ def create_warped_images(image, image_name, phase):
         train_or_test {"train", "test"}: Select wether the data is used for training or testing. Defaults to "train".
         refract_or_reflect {"refraction", "reflection"}: Select if refraction or reflection model is used. Defaults to "refraction".
     """
+    if gray_scale:
+        # not true gray scale
+        image = image[:,:,0]
+    
     # Normalization
     rgb = image / 255.0
     
-    # save_dir = os.path.join(DATA_SETS_DIR, phase,  train_or_test)
-    warp_dir = os.path.join(DATA_SETS_DIR, phase, "warp_map")
+    warp_dir = os.path.join(DATA_SETS_DIR, "warp_map")
         
     for transparent in ["refraction"]: #["reflection", "refraction"]
-        warp_dir = os.path.join(DATA_SETS_DIR, phase, "warp_map", transparent)
+        warp_dir = os.path.join(DATA_SETS_DIR, "warp_map", transparent)
         for file in os.listdir(warp_dir):
             warp_map = np.load(os.path.join(warp_dir, file))
             image_name_save = image_name + file[8:-3] + "png" # check this
@@ -105,20 +108,18 @@ def create_warped_images(image, image_name, phase):
             rgb_deformation = deform_image(rgb, warp_map)
             image_deformation = np.array(rgb_deformation * 255, dtype=np.uint8)
 
-            imwrite(os.path.join(DATA_SETS_DIR, phase, "warped_image", transparent, image_name_save), image_deformation)
+            imwrite(os.path.join(DATA_SETS_DIR, "warped_image", transparent, image_name_save), image_deformation)
             
             
 if __name__ == "__main__":
-    phase = "train" #"test"/validation
-    
     create_directory_structure()
-    create_depth_and_normal_maps(phase, w=128, fps=10)
-    create_warp_maps(phase, n1=1, n2=1.33) 
+    create_depth_and_normal_maps(w=128, fps=4.5)
+    create_warp_maps(n1=1, n2=1.33) 
     
-    # # Create deformed image for each reference pattern
+    # Create deformed image for each reference pattern
     for file in os.listdir('reference_patterns'):
         file_name = os.path.splitext(file)[0]
         file_path = os.path.join('reference_patterns', file)
         image  = imread(file_path)
 
-        create_warped_images(image, file_name, phase)
+        create_warped_images(image, file_name, gray_scale=True)
