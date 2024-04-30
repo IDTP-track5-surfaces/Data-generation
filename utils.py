@@ -95,7 +95,6 @@ def deform_image(img, warp_map):
 
     # Interpolate all channels of the image
     for k in range(nChannel):
-        currFrame_valid = np.zeros(h * w)
         currFrame = griddata((X.flatten(), Y.flatten()), img[:,:,k].flatten(), (Xnew, Ynew), method='linear', fill_value = 0)
         imgCurr[:,:, k] = np.reshape(currFrame, (h_map, w_map))
     
