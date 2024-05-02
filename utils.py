@@ -1,6 +1,5 @@
 import numpy as np
 from scipy.interpolate import griddata
-from scipy.ndimage import gaussian_filter #,sobel
 
    
 # Function to perform ray tracing
@@ -29,11 +28,14 @@ def raytracing_im_generator_ST(normal, depth_map, transparent, n1=1, n2=1.33):
         s1 = np.einsum('ij,pqj->pqi', R, s1)
         
         s2 = reflection(normal, s1)
-                
-        gamma = 256*.2
+        
+        # Scaling factor for setup   
+        X,_ = np.meshgrid(np.arange(width),np.arange(width))
+        d = .5*52e-3 
+        l = d/np.sin(theta) + X*np.sin(theta)/scaling
 
         r = np.abs(s1)
-        w = -gamma*(s2 - r*np.einsum('ijk, ijk->ij', s2, r)[..., None])
+        w = -l[...,None]*(s2 - r*np.einsum('ijk, ijk->ij', s2, r)[..., None])*scaling
 
         x_c = w[:,:,0]
         y_c = np.sqrt(w[:,:,1]**2 + w[:,:,2]**2)
