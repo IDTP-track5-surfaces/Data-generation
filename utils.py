@@ -2,10 +2,23 @@ import numpy as np
 from scipy.interpolate import griddata
 
    
-# Function to perform ray tracing
-def raytracing_im_generator_ST(normal, depth_map, transparent, n1=1, n2=1.33):
+def raytracing_im_generator_ST(normal, depth_map, transparent = "refraction", n1=1.0, n2=1.33):
+    """A raytracing model that creates a warp map that can be used to generate a warped image based on either reflection or refraction. 
+
+    Args:
+        normal (array_like): (n,n,3)-array which contains the normal vectors for each point on a n x n grid.
+        depth_map (array_like): (n,n,1)-array which contains the height of the fluid for each point on a n x n grid.
+        transparent {"refraction", "reflection"}: Selector for wether the raytracing model should use refraction or reflection. Defaults to "refraction".
+        n1 (float, optional): Refractive index of incident medium. Not necesarry for reflection. Defaults to 1.0 for air.
+        n2 (float, optional): Refractive index of transmitted medium. Not necesarry for reflection. Defaults to 1.33 for water.
+
+    Returns:
+        warp_map (array_like): (n,n,2)-array that contains how much each pixel should be shifted for both the x and y coordinates.
+    """
     width, height = depth_map.shape
-    scaling = width/(2*52e-3)
+    
+    # Scaling factor to scale from real distances to pixels
+    scaling = width/(2*52e-3) 
     
     # Create incident vectors
     s1 = np.zeros_like(normal)
@@ -13,10 +26,12 @@ def raytracing_im_generator_ST(normal, depth_map, transparent, n1=1, n2=1.33):
     
     if transparent == "refraction":
         s2 = refraction(normal, s1, n1, n2)
-               
+        
+        # Scale unit vectors to pixels    
         a = depth_map / s2[:, :, 2]
         x_c = (a * s2[:, :, 0])*scaling
         y_c = (a * s2[:, :, 1])*scaling
+        
     elif transparent == "reflection":         
         # Rotation angle
         theta = np.deg2rad(80) # incident angle
@@ -34,9 +49,11 @@ def raytracing_im_generator_ST(normal, depth_map, transparent, n1=1, n2=1.33):
         d = .5*52e-3 
         l = d/np.sin(theta) + X*np.sin(theta)/scaling
 
+        # Orthogonal projection for shift vector
         r = np.abs(s1)
         w = -l[...,None]*(s2 - r*np.einsum('ijk, ijk->ij', s2, r)[..., None])*scaling
 
+        # Map shift vector to shift in pixels
         x_c = w[:,:,0]
         y_c = np.sqrt(w[:,:,1]**2 + w[:,:,2]**2)
     else:
@@ -47,20 +64,46 @@ def raytracing_im_generator_ST(normal, depth_map, transparent, n1=1, n2=1.33):
 
     return warp_map
 
-# This is equivalent formula from wikipedia: https://en.wikipedia.org/wiki/Snell%27s_law
+
 def refraction(normal, s1, n1, n2):
+    """Refraction model that calculates the refracted unit vectors for a n x n  grid with the use of Snell's law.
+
+    Args:
+        normal (array_like): (n,n,3)-array which contains the normal vectors for each point on a n x n grid.
+        s1 (array_like): (n,n,3)-array which contains the incident vectors for each point on a n x n grid.
+        n1 (float): Refractive index of incident medium.
+        n2 (float): Refractive index of transmitted medium.
+
+    Returns:
+        s2_normalized (array_like): (n,n,3)-array which contains the normalized refrected vectors for each point on a n x n grid.
+        
+    Notes:
+        See https://en.wikipedia.org/wiki/Snell%27s_law for detailed discription of Snell's law and its vector form.
+    """
     n = n1/n2
     
+    # dot product of -normal and s1
     cos1 = np.einsum('ijk, ijk->ij', -normal, s1)
-    cos2 = np.sqrt(1-n**2*(1-cos1**2))
     
+    cos2 = np.sqrt(1-n**2*(1-cos1**2))
     s2 = n*s1 + (n*cos1-cos2)[...,None]*normal
     
     s2_normalized = s2/np.linalg.norm(s2, axis =2)[..., None]
     
     return s2_normalized
 
+
 def reflection(normal, s1):
+    """Reflection model that calculates the reflected unit vectors for a n x n  grid by specular reflection.
+
+    Args:
+        normal (array_like): (n,n,3)-array which contains the normal vectors for each point on a n x n grid.
+        s1 (array_like): (n,n,3)-array which contains the incident vectors for each point on a n x n grid.
+
+    Returns:
+       s2_normalized (array_like): (n,n,3)-array which contains the normalized reflected vectors for each point on a n x n grid.
+    """
+    # Dot product of -normal and s1
     cos1 = np.einsum('ijk, ijk->ij', -normal, s1)
 
     s2 = s1 + 2*cos1[...,None]*normal
@@ -69,7 +112,17 @@ def reflection(normal, s1):
     
     return s2_normalized
 
+
 def deform_image(img, warp_map):
+    """Function to deform a reference image according to a warp map.
+
+    Args:
+        img (array_like): A 3D array containing float values of an image. The last axis are the channels of the images
+        warp_map (array_like): (n,n,2)-array that contains how much each pixel should be shifted for both the x and y coordinates.
+
+    Returns:
+        imgCurr (array_like): A 3D array containing float values of the deformed image. 
+    """
     h, w, nChannel = img.shape
     h_map, w_map, _ = warp_map.shape
     
@@ -97,6 +150,7 @@ def deform_image(img, warp_map):
 
     # Interpolate all channels of the image
     for k in range(nChannel):
+        # Interpolate to align shifted pixel values to correct pixels. 
         currFrame = griddata((X.flatten(), Y.flatten()), img[:,:,k].flatten(), (Xnew, Ynew), method='linear', fill_value = 0)
         imgCurr[:,:, k] = np.reshape(currFrame, (h_map, w_map))
     
