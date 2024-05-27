@@ -1,7 +1,6 @@
 import os
 import numpy as np
 from utils import *
-from scipy.interpolate import RectBivariateSpline
 from imageio.v2 import imwrite, imread
 
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -117,7 +116,7 @@ if __name__ == "__main__":
     create_warp_maps() 
     
     # Create deformed image for each reference pattern  
-    file_path = os.path.join('reference_patterns', "ref_seq_24.png")
+    file_path = os.path.join(REFERENCE_PATTERN_DIR, "ref_seq_24.png")
     image  = imread(file_path)
     create_warped_images(image)
     
