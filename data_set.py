@@ -18,6 +18,7 @@ def create_directory_structure():
             
             
 def create_depth_and_normal_maps(w=128, fps = 24):
+    # Create physical domain
     x = np.linspace(-52e-3,52e-3, w); # in meter
     y = np.linspace(-52e-3,52e-3, w); # in meter
     X, Y = np.meshgrid(x, y)
@@ -26,15 +27,9 @@ def create_depth_and_normal_maps(w=128, fps = 24):
     for wave_width in np.linspace(0.5, 3, 9):
         for wave_depth in np.linspace(-0.003, -0.008, num=6):
             for i, ta in enumerate(np.arange(start=0.5, stop=10, step=1/fps)):
-                depth_map = Puff_profile(X, Y, ta, depth=wave_depth, width=wave_width) 
                 
-                # # Apply 2D cubic spline interpolation
-                # depth_map_smooth = RectBivariateSpline(x, y, depth_map)
-                
-                # # Compute the gradients of depth_map_smooth with respect to x and y
-                # Gx = depth_map_smooth.partial_derivative(1,0)(x,y) 
-                # Gy = depth_map_smooth.partial_derivative(0,1)(x,y)
-                
+                # Create depth profile and gradients
+                depth_map = Puff_profile(X, Y, ta, depth=wave_depth, width=wave_width)                 
                 Gx, Gy = grad_puff_profile(X, Y, ta, depth=wave_depth, width=wave_width)
                     
                 # Create normal vectors
@@ -87,24 +82,25 @@ def create_warped_images(image, gray_scale=False):
         image_name (string): name of the image.
         refract_or_reflect {"refraction", "reflection"}: Select if refraction or reflection model is used. Defaults to "refraction".
     """
+    # Add axis for compatibility with RGB images
     if gray_scale:
-        # not true gray scale
         image = image[:,:,0][..., np.newaxis]
     
     # Normalization
     rgb = image / 255.0
     
-    warp_dir = os.path.join(DATA_SETS_DIR, "warp_map")
-        
+    warp_dir = os.path.join(DATA_SETS_DIR, "warp_map")    
     for transparent in ["refraction"]: #["reflection", "refraction"]
         warp_dir = os.path.join(DATA_SETS_DIR, "warp_map", transparent)
-        for file in os.listdir(warp_dir):
+        N = len(os.listdir(warp_dir))
+        for i, file in enumerate(os.listdir(warp_dir)):
             warp_map = np.load(os.path.join(warp_dir, file))
             image_name = file[5:-4] + ".png" # check this
         
             # Deform image
             rgb_deformation = deform_image(rgb, warp_map)
             
+            # Copy gray scale deformation for RGB channels
             if gray_scale:
                 rgb_deformation = np.concatenate(3*[rgb_deformation], axis=-1)
             
@@ -112,6 +108,8 @@ def create_warped_images(image, gray_scale=False):
             image_deformation = np.array(rgb_deformation * 255, dtype=np.uint8)
             imwrite(os.path.join(DATA_SETS_DIR, transparent, image_name), image_deformation)
             
+            if i%100 == 0:
+                print(f"{i/N*100} %")
             
 if __name__ == "__main__":
     create_directory_structure()  
@@ -119,8 +117,8 @@ if __name__ == "__main__":
     create_warp_maps() 
     
     # Create deformed image for each reference pattern  
-    # file_path = os.path.join('reference_patterns', file_name)
-    # image  = imread(file_path)
-    # create_warped_images(image)
+    file_path = os.path.join('reference_patterns', "ref_seq_24.png")
+    image  = imread(file_path)
+    create_warped_images(image)
     
     print("Data generation is finished")
