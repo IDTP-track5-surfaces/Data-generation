@@ -3,3 +3,5 @@ __pycache__/
 data_sets/
 reference_patterns/*
 data_zips/
+reference_patterns_2x/
+real_data/
