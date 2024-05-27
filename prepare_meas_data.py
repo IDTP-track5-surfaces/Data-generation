@@ -72,14 +72,16 @@ def preprocess_depth_array(depth_array, bounds = (-22, 28)):
     lb, ub = bounds
     max_radius = np.abs((lb-ub)/np.sqrt(2))
     
+    # Crop data for lower and upper bounds
     data = depth_array.copy()
-    
     data = data[np.where(data[:,0]>lb)]
     data = data[np.where(data[:,0]<ub)]
     
+    # Transpose data to start from 0 and be monotonically increasing
     data[:,0] = np.flip(np.abs(data[:,0] - ub))
     data[:,1] = np.flip(data[:,1])
     
+    # Mirror data for axisymetry in 1D
     x_data = np.concatenate([-np.flip(data[:,0]), data[:,0]])
     y_data = np.concatenate([np.flip(data[:,1]), data[:,1]])
     
@@ -92,15 +94,14 @@ def preprocess_depth_array(depth_array, bounds = (-22, 28)):
 
 def parameter_fit(data, maxfev=50000):
     x_data, y_data = data
-    
     parameters, covariance = curve_fit(puff_fit, x_data, y_data, maxfev=maxfev)
     return parameters
 
 def create_depth(width, parameters):
+    # get radial coordinates
     xy_range = np.linspace(-width, width, 128)
     X, Y = np.meshgrid(xy_range, xy_range)
     mesh = np.sqrt(X**2 + Y**2)
-    # mesh /= 1000
     
     a,b,c,d = parameters
     depth = puff_fit(mesh, a,b,c,d)
@@ -121,11 +122,10 @@ def make_depth_maps(width, save_location = DATA_DIR, laser_directory = LASER_DIR
             
         depth = create_depth(width, parameters)
         file_loc = os.path.join(save_location, pressure, "depth.npy")
-        
         np.save(file_loc, depth)
     
-    plt.plot(depth[64,:])
-    plt.show()
+    # plt.plot(depth[64,:])
+    # plt.show()
 
 if __name__ == "__main__":
     os.makedirs(DATA_DIR, exist_ok=True)
