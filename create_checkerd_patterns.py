@@ -34,6 +34,7 @@ if __name__ == "__main__":
         checkerboard_array = create_checkerboard_array(array_size, tile_size)
         ax[i].imshow(checkerboard_array, cmap='gray')
         
+        # Save image
         file_loc = os.path.join(REFERNCE_PATTERNS_DIR, f"grid{tile_size}.png")
         imwrite(file_loc, checkerboard_array)
 
