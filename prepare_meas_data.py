@@ -1,8 +1,8 @@
 import os
 import cv2
+import warnings
 import numpy as np
 import pandas as pd
-# import matplotlib.pyplot as plt
 
 from scipy.optimize import curve_fit
 
@@ -15,7 +15,11 @@ LASER_DIR = os.path.join(MEAS_DIR, "laser")
 def r(x,y):
     return np.sqrt(x**2 + y**2)
 
-def preproces_image(file_loc):
+def puff_fit(r, a,b,c,d):
+    # scaled logistic function describing surface deformation
+    return d + (c) / (1 + np.exp(a - b * r**2))
+
+def preprocess_image(file_loc):
     image = cv2.imread(file_loc)
     h,w,_ = image.shape
     w_m = int(12*w/(12+20))
@@ -48,7 +52,7 @@ def create_image_data(save_location = DATA_DIR, image_directory = IMAGE_DIR):
         
         for img_name in os.listdir(pressure_directory):
             img_loc = os.path.join(pressure_directory, img_name)
-            img = preproces_image(img_loc)
+            img = preprocess_image(img_loc)
             
             save_loc = os.path.join(save_location, pressure)
             os.makedirs(save_loc, exist_ok=True)
@@ -57,7 +61,7 @@ def create_image_data(save_location = DATA_DIR, image_directory = IMAGE_DIR):
             cv2.imwrite(file_name, img) 
 
 def read_csv_laser_measurements(pressure_directory):
-    depth_array = [pd.read_csv(os.path.join(LASER_DIR, pressure, file), sep = ';', header=2).to_numpy() for file in pressure_directory]
+    depth_array = [pd.read_csv(os.path.join(pressure_directory, file), sep = ';', header=2).to_numpy() for file in os.listdir(pressure_directory)]
         
     # Equal shape
     shapes = [depth.shape[0] for depth in depth_array]
@@ -67,17 +71,60 @@ def read_csv_laser_measurements(pressure_directory):
     depth_array = np.mean(np.stack(depth_array, axis = -1), axis=-1)
     return depth_array
 
+def preprocess_depth_array(depth_array, bounds = (-22, 28)):
+    lb, ub = bounds
+    max_radius = np.abs((lb-ub)/np.sqrt(2))
+    
+    data = depth_array[np.where(depth_array[:,0]>lb)]
+    data = depth_array[np.where(depth_array[:,0]<ub)]
+
+    data[:,0] = np.flip(np.abs(data[:,0] - ub))
+    data[:,1] = np.flip(data[:,1])
+    
+    x_data = np.concatenate([-np.flip(data[:,0]), data[:,0]])
+    y_data = np.concatenate([np.flip(data[:,1]), data[:,1]])
+    
+    # convert mm to m
+    x_data /= 1000
+    y_data /= 1000
+    max_radius /= 1000
+    
+    return (x_data, y_data), max_radius
+
+def parameter_fit(data, func=puff_fit, maxfev=50000):
+    x_data, y_data = data
+    parameters, covariance = curve_fit(func, x_data, y_data, maxfev=maxfev)
+    return parameters, func
+
+def create_depth(width, parameters, func=puff_fit):
+    xy_range = np.linspace(-width, width, 128)
+    X, Y = np.meshgrid(xy_range, xy_range)
+    mesh = r(X, Y)
+    # mesh /= 1000
+    
+    a,b,c,d = parameters
+    depth = puff_fit(mesh,a,b,c,d)
+    return depth
+    
+def make_depth_maps(width, save_location = DATA_DIR, laser_directory = LASER_DIR):
+
+    
+    for pressure in os.listdir(laser_directory):
+        pressure_directory = os.path.join(laser_directory, pressure)
+        depth_array = read_csv_laser_measurements(pressure_directory)
+        data, max_radius = preprocess_depth_array(depth_array)
+        parameters, func = parameter_fit(data)
+        
+        if width > max_radius:
+            warnings.warn('width is larger than the maximum radius. Therefore, width=max_radius.') 
+            width = max_radius
+            
+        depth = create_depth(width, parameters, func=func)
+        file_loc = os.path.join(save_location, pressure, "depth.npy")
+        np.save(file_loc, depth)
+    
+    
 if __name__ == "__main__":
     os.makedirs(DATA_DIR, exist_ok=True)
     create_image_data()
-    
-    for pressure in os.listdir(LASER_DIR):
-        pressure_directory = os.listdir(os.path.join(LASER_DIR, pressure))
-        depth_array = read_csv_laser_measurements(pressure_directory)
-        
-        
-            
-            
-
-
-    # preproces_image()
+    make_depth_maps(20e-3)
