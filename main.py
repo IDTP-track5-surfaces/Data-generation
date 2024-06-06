@@ -33,7 +33,7 @@ def create_directory_structure(data_dir, doReflection):
             os.makedirs(os.path.join(data_dir, subdir))
             os.makedirs(os.path.join(data_dir, "warp_map", subdir))
 
-def create_depth_and_normal_maps(data_dir, w=128, fps=24):
+def create_depth_and_normal_maps(data_dir, w=128, fps=24, n_width=9, n_depth=6):
     """
     Creates depth maps according to the puff rheometer data,
     and calculates the corresponding normal map.
@@ -50,8 +50,8 @@ def create_depth_and_normal_maps(data_dir, w=128, fps=24):
     
     seq = 0  # Initialize sequence counter
     # Loop over different wave parameters
-    for wave_width in np.linspace(0.5, 3, 9):
-        for wave_depth in np.linspace(-0.003, -0.008, num=6):
+    for wave_width in np.linspace(0.5, 3, num=n_width):
+        for wave_depth in np.linspace(-0.003, -0.008, num=n_depth):
             # Loop over time steps
             for i, ta in enumerate(np.arange(start=0.5, stop=10, step=1/fps)):
                 
@@ -95,7 +95,10 @@ def create_warp_maps(data_dir, doReflection, n1=1, n2=1.33):
     depth_dir = os.path.join(data_dir, "depth")
     
     # Iterate through files in normal and depth directories
-    for normal_file, depth_file in zip(os.listdir(normal_dir), os.listdir(depth_dir)):
+    for normal_file, depth_file in tqdm(zip(os.listdir(normal_dir), 
+                                            os.listdir(depth_dir)), 
+                                        total=len(os.listdir(depth_dir)),
+                                        desc=f"Processing warp maps"):
         # Extract the file index from the depth file name
         file_index = os.path.splitext(depth_file[9:])[0]
         
