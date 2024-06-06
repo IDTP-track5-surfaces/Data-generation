@@ -162,11 +162,14 @@ def main(data_dir, ref_file_path, doCreateMaps=False, doCreateImages=False, doRe
     if not doCreateMaps and not doCreateImages:
         print("Neither maps, nor images are created.")
         return
+    
     create_directory_structure(data_dir, doReflection) 
     print("Directory structure is created.") 
+    
     if doCreateMaps:
         create_depth_and_normal_maps(data_dir, fps=12)
         print("Depth and normal maps are created.") 
+        
         create_warp_maps(data_dir, doReflection) 
         print("Warp maps are created.")
     
@@ -174,6 +177,7 @@ def main(data_dir, ref_file_path, doCreateMaps=False, doCreateImages=False, doRe
         if ref_file_path == '':
             print("Reference image should be given.")
             return
+        
         image  = imread(ref_file_path)
         create_warped_images(image, data_dir, doReflection)
         print("Image creation is finished.")
