@@ -79,33 +79,40 @@ def create_depth_and_normal_maps(data_dir, w=128, fps=24):
             
             # Increase sequence number for different simulation parameters
             seq += 1
-
     return
 
-def create_warp_maps(data_dir, doReflection, n1 = 1, n2 = 1.33):
-    """This function creates a warp map corresponding to a depth map and normalmap
-    
+def create_warp_maps(data_dir, doReflection, n1=1, n2=1.33):
+    """
+    This function creates a warp map corresponding to a depth map and normal map.
+
     Args:
-        data_dir (string): Root directory location where the data will be stored.
-        doReflection (boolean): Specify if reflection warp maps are created.
+        data_dir (str): Root directory location where the data will be stored.
+        doReflection (bool): Specify if reflection warp maps are created.
         n1 (float, optional): Refractive index of the incident medium. Defaults to 1 (air).
         n2 (float, optional): Refractive index of refractive medium. Defaults to 1.33 (water).
     """
     normal_dir = os.path.join(data_dir, "normal")
     depth_dir = os.path.join(data_dir, "depth")
     
+    # Iterate through files in normal and depth directories
     for normal_file, depth_file in zip(os.listdir(normal_dir), os.listdir(depth_dir)):
+        # Extract the file index from the depth file name
         file_index = os.path.splitext(depth_file[9:])[0]
+        
+        # Load normal and depth maps
         normal = np.load(os.path.join(normal_dir, normal_file))
         depth_map = np.load(os.path.join(depth_dir, depth_file))
         
+        # Initialize list of directories for warp maps
         dirs = ["refraction"]
         if doReflection:
             dirs.append("reflection")
-            
+        
         for transparent in dirs:
             warp_map = raytracing_im_generator_ST(normal, depth_map, transparent, n1=n1, n2=n2)
-            file_name = "warp_seq" + file_index
+            
+            # Construct file name and save warp map
+            file_name = f"warp_seq{file_index}"
             np.save(os.path.join(data_dir, "warp_map", transparent, file_name), warp_map)
             
                     
