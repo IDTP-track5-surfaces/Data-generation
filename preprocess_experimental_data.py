@@ -47,14 +47,14 @@ def create_image_data(save_location = DATA_DIR, image_directory = IMAGE_DIR):
     for pressure in os.listdir(image_directory):
         pressure_directory = os.path.join(image_directory, pressure)
         
-        for img_name in os.listdir(pressure_directory):
+        for i, img_name in enumerate(os.listdir(pressure_directory)):
             img_loc = os.path.join(pressure_directory, img_name)
             img = preprocess_image(img_loc)
             
-            save_loc = os.path.join(save_location, pressure)
+            save_loc = os.path.join(save_location, "refraction")
             os.makedirs(save_loc, exist_ok=True)
             
-            file_name = os.path.join(save_loc, img_name)
+            file_name = os.path.join(save_loc, pressure.replace(" ", "-") + f"-{i}.jpg")
             cv2.imwrite(file_name, img) 
 
 def read_csv_laser_measurements(pressure_directory):
@@ -121,11 +121,18 @@ def make_depth_maps(width, save_location = DATA_DIR, laser_directory = LASER_DIR
             width = max_radius
             
         depth = create_depth(width, parameters)
-        file_loc = os.path.join(save_location, pressure, "depth.npy")
-        np.save(file_loc, depth)
+        Gx, Gy = np.gradient(depth)
+        
+        normal = np.stack([-Gx, -Gy, np.ones_like(Gx)], axis=-1)
+        norm = np.linalg.norm(normal, axis=-1)
+        normal /= norm[..., np.newaxis]
     
-    # plt.plot(depth[64,:])
-    # plt.show()
+        for i in range(10):
+            file_loc_depth = os.path.join(save_location, "depth", f"depth_{pressure.replace(" ", "-")}-{i}.npy")
+            np.save(file_loc_depth, depth)
+            
+            file_loc_normal = os.path.join(save_location, "normal", f"normal_{pressure.replace(" ", "-")}-{i}.npy")
+            np.save(file_loc_normal, normal)              
 
 if __name__ == "__main__":
     os.makedirs(DATA_DIR, exist_ok=True)
