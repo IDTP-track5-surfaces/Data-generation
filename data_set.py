@@ -33,24 +33,26 @@ def create_directory_structure(data_dir, doReflection):
             os.makedirs(os.path.join(data_dir, subdir))
             os.makedirs(os.path.join(data_dir, "warp_map", subdir))
 
-                
-def create_depth_and_normal_maps(data_dir, w=128, fps = 24):
-    """Creates depth maps according to the puff rheomter data, 
+def create_depth_and_normal_maps(data_dir, w=128, fps=24):
+    """
+    Creates depth maps according to the puff rheometer data,
     and calculates the corresponding normal map.
 
     Args:
-        data_dir (string): root directory location where the data will be stored.
-        w (int, optional): Width in number of pixels . Defaults to 128.
+        data_dir (str): Root directory location where the data will be stored.
+        w (int, optional): Width in number of pixels. Defaults to 128.
         fps (int, optional): Frames per second. Defaults to 24.
     """
-    # Create physical domain
-    x = np.linspace(-52e-3,52e-3, w); # in meter
-    y = np.linspace(-52e-3,52e-3, w); # in meter
-    X, Y = np.meshgrid(x, y)
+    # Create physical domain coordinates
+    x = np.linspace(-52e-3, 52e-3, w)  # in meters
+    y = np.linspace(-52e-3, 52e-3, w)  # in meters
+    X, Y = np.meshgrid(x, y) 
     
-    seq = 0
+    seq = 0  # Initialize sequence counter
+    # Loop over different wave parameters
     for wave_width in np.linspace(0.5, 3, 9):
         for wave_depth in np.linspace(-0.003, -0.008, num=6):
+            # Loop over time steps
             for i, ta in enumerate(np.arange(start=0.5, stop=10, step=1/fps)):
                 
                 # Create depth profile and gradients
@@ -58,24 +60,26 @@ def create_depth_and_normal_maps(data_dir, w=128, fps = 24):
                 Gx, Gy = grad_puff_profile(X, Y, ta, depth=wave_depth, width=wave_width)
                     
                 # Create normal vectors
-                normal_ori = np.ones((w, w, 3)) # Default reference image size
-                normal_ori[:, :, 0] = -Gx
-                normal_ori[:, :, 1] = -Gy
+                normal_ori = np.ones((w, w, 3))  # Initialize normal map
+                normal_ori[:, :, 0] = -Gx  # X gradient
+                normal_ori[:, :, 1] = -Gy  # Y gradient
                 
                 # Normalize normal vectors
                 norm = np.sqrt(Gx**2 + Gy**2 + 1)
                 normal = normal_ori / norm[..., None]
 
-                # Adjust height
-                depth_map = depth_map + 1e-2  # in meters
+                # Adjust height to undeformed surface height
+                depth_map += 1e-2  # in meters
             
-                # Save normal and depth map
+                # Save normal and depth maps
                 file_name_depth = f"depth_seq{seq}-f{i}" 
                 file_name_normal = f"normal_seq{seq}-f{i}" 
                 np.save(os.path.join(data_dir, "depth", file_name_depth), depth_map)
                 np.save(os.path.join(data_dir, "normal", file_name_normal), normal)
-            # Increase sequence number for different simulation
-            seq +=1
+            
+            # Increase sequence number for different simulation parameters
+            seq += 1
+
     return
 
 def create_warp_maps(data_dir, doReflection, n1 = 1, n2 = 1.33):
