@@ -1,39 +1,54 @@
 import os
 import numpy as np
 import argparse
-import tqdm
+from tqdm import tqdm
 
 from utils import *
 from imageio.v2 import imwrite, imread
 
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
 
+
 def create_directory_structure(data_dir, doReflection):
-    """_summary_
+    """
+    Creates directory structure for saving data.
 
     Args:
-        data_dir (string): root directory location where the data will be stored.
+        data_dir (str): Root directory location where the data will be stored.
+        doReflection (bool): Specify if reflection directory is created.
     """
+    # Check if the root data directory does not exist
     if not os.path.exists(data_dir):
+        # Create primary subdirectories: 'depth' and 'normal'
         os.makedirs(os.path.join(data_dir, "depth"))
         os.makedirs(os.path.join(data_dir, "normal"))
         
         dirs = ["refraction"]
+        # If reflection data is needed, add 'reflection' to the list of directories
         if doReflection:
             dirs.append("reflection")
 
-        for j in dirs:
-            os.makedirs(os.path.join(data_dir, j))
-            os.makedirs(os.path.join(data_dir, "warp_map", j))
+        # Create specified subdirectories and their corresponding 'warp_map' subdirectories
+        for subdir in dirs:
+            os.makedirs(os.path.join(data_dir, subdir))
+            os.makedirs(os.path.join(data_dir, "warp_map", subdir))
 
                 
 def create_depth_and_normal_maps(data_dir, w=128, fps = 24):
+    """Creates depth maps according to the puff rheomter data, 
+    and calculates the corresponding normal map.
+
+    Args:
+        data_dir (string): root directory location where the data will be stored.
+        w (int, optional): Width in number of pixels . Defaults to 128.
+        fps (int, optional): Frames per second. Defaults to 24.
+    """
     # Create physical domain
     x = np.linspace(-52e-3,52e-3, w); # in meter
     y = np.linspace(-52e-3,52e-3, w); # in meter
     X, Y = np.meshgrid(x, y)
-    seq = 0
     
+    seq = 0
     for wave_width in np.linspace(0.5, 3, 9):
         for wave_depth in np.linspace(-0.003, -0.008, num=6):
             for i, ta in enumerate(np.arange(start=0.5, stop=10, step=1/fps)):
@@ -67,7 +82,8 @@ def create_warp_maps(data_dir, doReflection, n1 = 1, n2 = 1.33):
     """This function creates a warp map corresponding to a depth map and normalmap
     
     Args:
-        data_dir (string): root directory location where the data will be stored.
+        data_dir (string): Root directory location where the data will be stored.
+        doReflection (boolean): Specify if reflection warp maps are created.
         n1 (float, optional): Refractive index of the incident medium. Defaults to 1 (air).
         n2 (float, optional): Refractive index of refractive medium. Defaults to 1.33 (water).
     """
@@ -95,8 +111,8 @@ def create_warped_images(image, data_dir, doReflection, gray_scale=False):
     Args:
         image (ndarray): image with 3 channels for the RGB values.
         data_dir (string): root directory location where the data will be stored.
-        image_name (string): name of the image.
-        refract_or_reflect {"refraction", "reflection"}: Select if refraction or reflection model is used. Defaults to "refraction".
+        doReflection (boolean): Specify if reflection images are created.
+        gray_scale (boolean, optional): Specify if a grayscale image is used.
     """
     # Add axis for compatibility with RGB images
     if gray_scale:
@@ -127,30 +143,25 @@ def create_warped_images(image, data_dir, doReflection, gray_scale=False):
             # Save image
             image_deformation = np.array(rgb_deformation * 255, dtype=np.uint8)
             imwrite(os.path.join(data_dir, transparent, image_name), image_deformation)
-            
-            # if i%100 == 0:
-            #     print(f"{i/N*100} %")
 
-def main(data_dir, ref_file_path, doCreateMaps=False, doCreateImages=False):
+def main(data_dir, ref_file_path, doCreateMaps=False, doCreateImages=False, doReflection=False):
     if not doCreateMaps and not doCreateImages:
         print("Neither maps, nor images are created.")
         return
-    
-    create_directory_structure(data_dir) 
+    create_directory_structure(data_dir, doReflection) 
     print("Directory structure is created.") 
     if doCreateMaps:
         create_depth_and_normal_maps(data_dir, fps=12)
         print("Depth and normal maps are created.") 
-        create_warp_maps(data_dir) 
+        create_warp_maps(data_dir, doReflection) 
         print("Warp maps are created.")
     
-    if doCreateMaps:
-        # file_path = os.path.join(REFERENCE_PATTERN_DIR, "ref_seq_24.png")
+    if doCreateImages:
         if ref_file_path == '':
             print("Reference image should be given.")
             return
         image  = imread(ref_file_path)
-        create_warped_images(image, data_dir)
+        create_warped_images(image, data_dir, doReflection)
         print("Image creation is finished.")
 
 if __name__ == "__main__":
@@ -160,6 +171,7 @@ if __name__ == "__main__":
     parser.add_argument('--ref_image', type=str, default='', help='File location of reference image.')
     parser.add_argument('--create_maps', action='store_true', help='Specify if depth/normal and warp maps should be created.')
     parser.add_argument('--create_images', action='store_true', help='Specify if images should be created.')
+    parser.add_argument('--reflection', action='store_true', help='Specify if data generation should also be done for reflection.')
 
     args = parser.parse_args()
 
@@ -168,10 +180,11 @@ if __name__ == "__main__":
     CREATE_MAPS = args.create_maps
     CREATE_IMAGES = args.create_images
     REF_IMAGE = args.ref_image
+    REFLECTION = args.reflection
     
     data_loc = args.data_dir
     if args.data_dir == '':
         data_loc = "data_sets" 
     DATA_SETS_DIR = os.path.join(ROOT_DIR, data_loc)
              
-    main(DATA_SETS_DIR, REF_IMAGE, doCreateMaps=CREATE_MAPS, doCreateImages=CREATE_IMAGES)
+    main(DATA_SETS_DIR, REF_IMAGE, doCreateMaps=CREATE_MAPS, doCreateImages=CREATE_IMAGES, doReflection=REFLECTION)
