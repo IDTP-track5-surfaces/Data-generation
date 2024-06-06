@@ -117,42 +117,45 @@ def create_warp_maps(data_dir, doReflection, n1=1, n2=1.33):
             
                     
 def create_warped_images(image, data_dir, doReflection, gray_scale=False):
-    """This function warps a image according to a warp map.
+    """
+    This function warps an image according to a warp map.
     
     Args:
-        image (ndarray): image with 3 channels for the RGB values.
-        data_dir (string): root directory location where the data will be stored.
-        doReflection (boolean): Specify if reflection images are created.
-        gray_scale (boolean, optional): Specify if a grayscale image is used.
+        image (ndarray): Image with 3 channels for the RGB values.
+        data_dir (str): Root directory location where the data will be stored.
+        doReflection (bool): Specify if reflection images are created.
+        gray_scale (bool, optional): Specify if a grayscale image is used.
     """
-    # Add axis for compatibility with RGB images
+    # Add an axis for compatibility with RGB images if the image is grayscale
     if gray_scale:
-        image = image[:,:,0][..., np.newaxis]
+        image = image[:, :, 0][..., np.newaxis]
     
-    # Normalization
+    # Normalize the image to the range [0, 1]
     rgb = image / 255.0
     
-    warp_dir = os.path.join(data_dir, "warp_map") 
-
-    dirs = ["refraction"]
+    # Set up warp map directories
+    warp_dirs = ["refraction"]
     if doReflection:
-        dirs.append("reflection")   
-    for transparent in dirs:
+        warp_dirs.append("reflection")
+    
+    for transparent in warp_dirs:
         warp_dir = os.path.join(data_dir, "warp_map", transparent)
-        N = len(os.listdir(warp_dir))
-        for i, file in tqdm(enumerate(os.listdir(warp_dir))):
-            warp_map = np.load(os.path.join(warp_dir, file))
-            image_name = file[5:-4] + ".png"
+        os.makedirs(os.path.join(data_dir, transparent), exist_ok=True)  
         
-            # Deform image
+        # Iterate through warp map files in the current warp directory
+        for file in tqdm(os.listdir(warp_dir), desc=f"Processing {transparent} maps"):
+            warp_map = np.load(os.path.join(warp_dir, file))
             rgb_deformation = deform_image(rgb, warp_map)
             
-            # Copy gray scale deformation for RGB channels
+            # If the image is grayscale, replicate the deformation across the RGB channels
             if gray_scale:
-                rgb_deformation = np.concatenate(3*[rgb_deformation], axis=-1)
+                rgb_deformation = np.concatenate([rgb_deformation] * 3, axis=-1)
             
-            # Save image
+            # Convert the deformed image back to uint8 format
             image_deformation = np.array(rgb_deformation * 255, dtype=np.uint8)
+            
+            # Construct the output image file name and save the deformed image
+            image_name = f"{file[5:-4]}.png"
             imwrite(os.path.join(data_dir, transparent, image_name), image_deformation)
 
 def main(data_dir, ref_file_path, doCreateMaps=False, doCreateImages=False, doReflection=False):
