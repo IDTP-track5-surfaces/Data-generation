@@ -10,7 +10,7 @@ The depth, normal and warps maps can be created by running
 
     python main.py --create_maps
 
-and reference images can be created by running
+and warped images can be created by running
 
     python main.py --create_images --ref_image "<reference image>"
 
