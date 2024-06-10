@@ -14,7 +14,7 @@ and warped images can be created by running
 
     python main.py --create_images --ref_image "<reference image>"
 
-Both commands can be extended with ```--reflection``` flag, such that the whole process is also repeated for reflection.
+where ```"<reference image>"``` is the file location of the reference image. Both commands can be extended with ```--reflection``` flag, such that the whole process is also repeated for reflection.
 
 The script ```create_checkered_patterns.py``` can be used to create a black and white checkered pattern to be used as reference pattern. The script ```preprocess_experimental_data.py``` can be used to preprocess experimentally obtained data. 
 
