@@ -163,8 +163,7 @@ def create_warped_images(image, data_dir, doReflection, gray_scale=False):
 
 def main(data_dir, ref_file_path, doCreateMaps=False, doCreateImages=False, doReflection=False):
     if not doCreateMaps and not doCreateImages:
-        print("Neither maps, nor images are created.")
-        return
+        raise ValueError("Neither maps, nor images are created.")
     
     create_directory_structure(data_dir, doReflection) 
     print("Directory structure is created.") 
@@ -178,8 +177,7 @@ def main(data_dir, ref_file_path, doCreateMaps=False, doCreateImages=False, doRe
     
     if doCreateImages:
         if ref_file_path == '':
-            print("Reference image should be given.")
-            return
+            raise ValueError("Reference image should be given.")
         
         image  = imread(ref_file_path)
         create_warped_images(image, data_dir, doReflection)
